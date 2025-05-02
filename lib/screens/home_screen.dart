@@ -1,16 +1,16 @@
-# Refonte de HomeScreen avec Bento Grid et Material 3
+// Refonte de HomeScreen avec Bento Grid et Material 3
 
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
+// import 'package:flutter_contacts/flutter_contacts.dart'; // Importé via contact_with_operator
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:smart_sim_dz/models/contact_with_operator.dart';
+// import 'package:smart_sim_dz/models/contact_with_operator.dart'; // Pas utilisé directement ici
 import 'package:smart_sim_dz/utils/operator_detector.dart';
 import 'package:smart_sim_dz/screens/settings_screen.dart';
 import 'package:smart_sim_dz/screens/contacts_screen.dart'; // Écran séparé pour la liste complète
-import 'package:url_launcher/url_launcher.dart';
+// import 'package:url_launcher/url_launcher.dart'; // Pas utilisé directement ici
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -90,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         },
         onAdFailedToLoad: (ad, err) {
-          print('BannerAd failed to load: $err');
+          // print('BannerAd failed to load: $err'); // Remplacé par logger ou gestion d'erreur
           ad.dispose();
         },
       ),
@@ -175,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.share),
-            tooltip: 'Partager l\"application',
+            tooltip: 'Partager l"application', // Suppression de l'échappement inutile
             onPressed: _shareApp,
           ),
           IconButton(
@@ -191,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: !_isPremium && _isBannerAdLoaded && _bannerAd != null
           ? SafeArea(
             child: Container(
-                color: colorScheme.surfaceVariant, // Couleur de fond pour la bannière
+                color: colorScheme.surfaceContainerHighest, // Remplacement de surfaceVariant
                 height: _bannerAd!.size.height.toDouble(),
                 width: _bannerAd!.size.width.toDouble(),
                 child: AdWidget(ad: _bannerAd!),
@@ -233,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Card(
        // Utiliser le style Filled pour un look plus intégré
       elevation: 0,
-      color: colorScheme.surfaceVariant,
+      color: colorScheme.surfaceContainerHighest, // Remplacement de surfaceVariant
       child: InkWell(
         onTap: _navigateToContacts, // Naviguer vers l'écran des contacts au clic
         borderRadius: BorderRadius.circular(12.0),

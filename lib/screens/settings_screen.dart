@@ -1,4 +1,4 @@
-# Écran des paramètres pour configurer les SIM et afficher les codes USSD
+// Écran des paramètres pour configurer les SIM et afficher les codes USSD
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -151,7 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         labelText: 'Opérateur SIM $simSlot',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
         filled: true,
-        fillColor: colorScheme.surfaceVariant.withOpacity(0.5),
+        fillColor: colorScheme.surfaceContainerHighest,
       ),
       items: Operator.values.map((Operator operator) {
         final logoPath = getOperatorLogoPath(operator);

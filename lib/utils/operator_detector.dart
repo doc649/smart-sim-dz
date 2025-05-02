@@ -41,7 +41,7 @@ Color getOperatorColor(Operator operator) {
       return Colors.red.shade700;
     case Operator.ooredoo:
       // Utiliser une couleur orange/rouge plus proche du logo Ooredoo
-      return Color(0xFFE60012); // Rouge Ooredoo
+      return const Color(0xFFE60012); // Rouge Ooredoo
     case Operator.unknown:
     default:
       return Colors.grey.shade600;

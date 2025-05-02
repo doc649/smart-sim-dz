@@ -1,104 +1,85 @@
-# Documentation Smart SIM DZ
+# Smart SIM DZ - Refonte Moderne
 
-Ce document fournit les informations nécessaires pour comprendre, compiler et modifier l'application Smart SIM DZ.
+## Présentation
 
-## 1. Prérequis
+Ce projet est une refonte moderne de l'application "Smart SIM DZ". L'objectif était de moderniser l'interface utilisateur en adoptant les dernières tendances UI/UX (Material 3, Bento Grid), d'améliorer la base de code, et d'intégrer les fonctionnalités clés discutées, tout en assurant la compatibilité avec les versions récentes d'Android (notamment Android 14).
 
-Pour compiler et exécuter ce projet, vous aurez besoin de :
+## Modifications et Améliorations
 
-*   **Flutter SDK:** Assurez-vous d'avoir installé Flutter sur votre machine. Suivez les instructions officielles : [https://docs.flutter.dev/get-started/install](https://docs.flutter.dev/get-started/install)
-*   **Android SDK:** Flutter nécessite l'Android SDK pour la compilation Android. Celui-ci est généralement installé avec Android Studio. Assurez-vous que les outils de ligne de commande (`cmdline-tools`) sont installés via le SDK Manager d'Android Studio.
-*   **Un éditeur de code:** Visual Studio Code avec l'extension Flutter est recommandé, mais Android Studio ou IntelliJ IDEA fonctionnent également.
-*   **Un appareil Android (ou émulateur):** Pour tester l'application (Android 7.0 Nougat - API 24 ou supérieur).
+*   **Interface Utilisateur Moderne :**
+    *   Adoption de Material 3 pour les composants et le thème.
+    *   Thème dynamique (Material You) s'adaptant au fond d'écran de l'utilisateur (sur Android 12+).
+    *   Thèmes clair et sombre améliorés.
+    *   Écran d'accueil réorganisé en "Bento Grid" pour une meilleure lisibilité et un accès rapide aux informations clés (Statut SIM, Compteur d'appels optimisés, Recherche rapide).
+    *   Écran de contacts dédié avec barre de recherche intégrée.
+    *   Écran de paramètres revu avec configuration des SIM et liste des codes USSD organisée par opérateur.
+*   **Base de Code :**
+    *   Mise à jour des dépendances (Flutter, Gradle, AGP, plugins).
+    *   Remplacement du plugin obsolète `contacts_service` par `flutter_contacts`.
+    *   Refactoring du code pour utiliser la nouvelle API de `flutter_contacts`.
+    *   Correction de nombreux bugs de compilation et d'exécution liés aux incompatibilités de versions et aux API dépréciées.
+    *   Optimisation du code selon les recommandations de l'analyseur Flutter (utilisation de `const`, suppression des `print`, etc.).
+*   **Fonctionnalités :**
+    *   Affichage des logos des opérateurs (Mobilis, Djezzy, Ooredoo) à côté du nom.
+    *   Détection de l'opérateur basée sur les préfixes officiels.
+    *   Configuration manuelle des opérateurs pour chaque SIM dans les paramètres.
+    *   Affichage d'un compteur d'appels optimisés (incrémenté lors d'un appel via le bouton SIM recommandé).
+    *   Bouton d'appel intelligent sur la liste des contacts, suggérant la SIM à utiliser en fonction de l'opérateur du contact et des SIM configurées.
+    *   Accès rapide aux codes USSD courants (solde, rechargement) depuis l'écran des paramètres, organisés par opérateur.
+    *   Fonctionnalité de partage de l'application.
+    *   Gestion des permissions de contacts améliorée.
+    *   Intégration d'une bannière publicitaire AdMob (désactivée si l'utilisateur devient premium - fonctionnalité premium non implémentée).
 
-## 2. Configuration du projet
+## Instructions
 
-1.  **Récupérer le code source:** Placez le dossier `smart_sim_dz` (que je vous fournirai) sur votre ordinateur.
-2.  **Ouvrir le projet:** Ouvrez le dossier `smart_sim_dz` dans votre éditeur de code (VS Code, Android Studio...). 
-3.  **Installer les dépendances:** Ouvrez un terminal à la racine du projet (`smart_sim_dz`) et exécutez la commande suivante :
+### Prérequis
+
+*   Flutter SDK installé (version utilisée lors du développement : stable 3.x.x - à vérifier avec `flutter --version`)
+*   Android SDK configuré
+*   Un appareil ou émulateur Android (Android 14 recommandé pour tester toutes les fonctionnalités)
+
+### Compilation et Installation
+
+1.  **Cloner le dépôt :**
+    ```bash
+    git clone https://github.com/doc649/smart-sim-dz.git
+    cd smart-sim-dz
+    ```
+2.  **Récupérer les dépendances :**
     ```bash
     flutter pub get
     ```
-    Cela téléchargera toutes les bibliothèques nécessaires définies dans `pubspec.yaml`.
-
-## 3. Compilation de l'APK
-
-Une fois les dépendances installées, vous pouvez compiler l'APK.
-
-*   **Pour un test rapide (APK de débogage):**
+3.  **Compiler l'APK (debug) :**
     ```bash
     flutter build apk --debug
     ```
     L'APK se trouvera dans `build/app/outputs/flutter-apk/app-debug.apk`.
+4.  **Installer l'APK :** Transférez le fichier `app-debug.apk` sur votre appareil Android et installez-le (assurez-vous d'avoir autorisé l'installation depuis des sources inconnues).
 
-*   **Pour une version "Release" (APK optimisé):**
-    ```bash
-    flutter build apk --release
-    ```
-    L'APK se trouvera dans `build/app/outputs/flutter-apk/app-release.apk`. Cet APK est généralement non signé. Pour une distribution (par exemple sur le Play Store), vous devrez configurer la signature de l'application. Suivez les instructions officielles : [https://docs.flutter.dev/deployment/android#signing-the-app](https://docs.flutter.dev/deployment/android#signing-the-app)
+### Utilisation
 
-## 4. Installation de l'APK
+1.  **Premier Lancement :** L'application demandera l'autorisation d'accéder à vos contacts. Accordez-la pour que l'application puisse fonctionner.
+2.  **Configuration Initiale :** Allez dans l'écran "Paramètres" (icône roue dentée en haut à droite) et sélectionnez les opérateurs correspondants à vos cartes SIM 1 et SIM 2. C'est essentiel pour la fonctionnalité d'appel intelligent.
+3.  **Écran d'Accueil :**
+    *   Visualisez le statut de vos SIM configurées.
+    *   Voyez le nombre d'appels optimisés effectués.
+    *   Appuyez sur la barre de recherche pour accéder à la liste complète des contacts.
+4.  **Écran Contacts :**
+    *   Recherchez des contacts par nom ou numéro.
+    *   Pour chaque contact, l'opérateur détecté (basé sur le préfixe) est affiché.
+    *   Si l'opérateur du contact correspond à l'une de vos SIM configurées, un bouton "SIM X" (avec la couleur de l'opérateur) apparaît. Appuyez dessus pour lancer l'appel via la SIM recommandée (cela incrémente le compteur d'appels optimisés).
+    *   Si l'opérateur est inconnu ou ne correspond à aucune de vos SIM, une icône d'appel standard apparaît.
+5.  **Écran Paramètres :**
+    *   Modifiez la configuration de vos opérateurs SIM à tout moment.
+    *   Accédez aux codes USSD utiles pour chaque opérateur en dépliant la section correspondante.
+    *   Appuyez sur un code USSD pour le lancer.
 
-1.  **Transférer l'APK:** Copiez le fichier `.apk` généré (par exemple `app-release.apk`) sur votre appareil Android.
-2.  **Autoriser les sources inconnues:** Sur votre appareil Android, allez dans les Paramètres -> Sécurité (ou Applications & notifications -> Accès spécial des applications -> Installation d'applis inconnues) et autorisez l'installation d'applications depuis votre gestionnaire de fichiers ou votre navigateur.
-3.  **Installer:** Ouvrez le fichier `.apk` via un gestionnaire de fichiers sur votre appareil et suivez les instructions pour l'installer.
+## Prochaines Étapes Possibles
 
-
-
-
-## 5. Structure du Projet
-
-Le projet suit une structure Flutter standard, avec les répertoires clés suivants :
-
-*   `/lib`: Contient tout le code source Dart de l'application.
-    *   `/main.dart`: Point d'entrée de l'application, initialise Flutter et AdMob, définit le thème.
-    *   `/screens`: Contient les différents écrans (widgets `Scaffold`) de l'application.
-        *   `home_screen.dart`: Écran principal affichant la liste des contacts, la recherche, le compteur d'économies, la bannière publicitaire et les boutons d'appel.
-        *   `settings_screen.dart`: Écran de configuration permettant d'assigner les opérateurs aux SIMs et de gérer le statut premium.
-    *   `/models`: Contient les modèles de données.
-        *   `contact_with_operator.dart`: Modèle combinant un `Contact` Flutter avec son `Operator` détecté.
-    *   `/utils`: Contient les fonctions utilitaires.
-        *   `operator_detector.dart`: Logique pour détecter l'opérateur basé sur le préfixe du numéro et pour obtenir le nom/couleur de l'opérateur.
-*   `/android`: Contient les fichiers spécifiques à la plateforme Android (configuration, `AndroidManifest.xml`, `build.gradle`).
-*   `/ios`: Contient les fichiers spécifiques à la plateforme iOS (non utilisé activement dans ce projet initial).
-*   `/assets`: Pourrait contenir des ressources statiques comme des images ou des polices (non utilisé dans cette version).
-*   `pubspec.yaml`: Fichier de configuration du projet Flutter, listant les dépendances, les ressources, etc.
-*   `README.md`: Ce fichier de documentation.
-
-## 6. Modifications Courantes
-
-### a) Modifier les Préfixes Opérateurs
-
-La logique de détection des opérateurs se trouve dans le fichier `lib/utils/operator_detector.dart`.
-
-Pour modifier ou ajouter des préfixes :
-
-1.  Ouvrez le fichier `lib/utils/operator_detector.dart`.
-2.  Localisez la fonction `detectOperator(String phoneNumber)`.
-3.  Modifiez les conditions `startsWith()` pour ajuster les préfixes existants ou ajoutez de nouvelles conditions pour de nouveaux opérateurs.
-    *Exemple : Si Djezzy utilise aussi le préfixe '078', ajoutez `|| cleanedNumber.startsWith("078")` à la condition pour `Operator.djezzy`.*
-4.  Si vous ajoutez un nouvel opérateur, vous devrez également :
-    *   Ajouter une valeur à l'énumération `Operator`.
-    *   Ajouter une couleur correspondante dans la fonction `getOperatorColor(Operator operator)`.
-    *   Ajouter un nom correspondant dans la fonction `getOperatorName(Operator operator)`.
-
-### b) Modifier les Textes de l'Application
-
-La plupart des textes visibles par l'utilisateur se trouvent directement dans les fichiers de widgets sous `/lib/screens` (`home_screen.dart`, `settings_screen.dart`). Recherchez le texte que vous souhaitez modifier et remplacez-le directement dans le code.
-
-*Pour une application multilingue (future évolution), il faudrait extraire ces chaînes dans des fichiers de localisation dédiés.*
-
-### c) Modifier les Informations de Paiement Premium
-
-Les instructions affichées pour obtenir la version premium (paiement manuel) se trouvent dans `lib/screens/settings_screen.dart`, dans la fonction `_requestPremium()`. Modifiez le texte dans `AlertDialog` pour mettre à jour le montant, la méthode de paiement ou les informations de contact.
-
-### d) Remplacer les ID AdMob de Test
-
-Avant de publier l'application, vous **devez** remplacer les ID AdMob de test par vos propres ID réels :
-
-1.  **ID d'Application AdMob :** Dans `/android/app/src/main/AndroidManifest.xml`, remplacez la valeur `android:value` pour `com.google.android.gms.ads.APPLICATION_ID`.
-2.  **ID de Bloc d'Annonces (Bannière) :** Dans `lib/screens/home_screen.dart`, modifiez la valeur de la variable `_adUnitId`.
-
-Créez ces ID depuis votre compte AdMob ([https://admob.google.com/](https://admob.google.com/)).
+*   Implémenter la fonctionnalité Premium (suppression des pubs, fonctionnalités avancées).
+*   Améliorer la détection de l'opérateur (prise en compte de la portabilité via API externe si possible).
+*   Ajouter des contacts favoris sur l'écran d'accueil.
+*   Permettre la saisie du code pour les USSD de rechargement.
+*   Affiner l'interface utilisateur et ajouter des animations.
 
 

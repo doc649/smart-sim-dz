@@ -1,4 +1,4 @@
-# Écran affichant la liste complète des contacts avec recherche et appel optimisé
+// Écran affichant la liste complète des contacts avec recherche et appel optimisé
 
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
@@ -106,7 +106,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         });
       }
     } catch (e) {
-      print('Erreur lors du chargement/traitement des contacts: $e');
+      // Gérer l'erreur (log, message utilisateur, etc.) - print() supprimé
       if (mounted) {
         setState(() { _isLoading = false; });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -164,13 +164,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
       bool launched = await launchUrl(launchUri);
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Impossible de lancer l\"appel vers $phoneNumber')),
+          SnackBar(content: Text("Impossible de lancer l'appel vers $phoneNumber")),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors du lancement de l\"appel: $e')),
+          SnackBar(content: Text("Erreur lors du lancement de l'appel: $e")),
         );
       }
     }
@@ -198,7 +198,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: colorScheme.surfaceVariant,
+                fillColor: colorScheme.surfaceContainerHighest,
                 contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
               ),
             ),
@@ -308,9 +308,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
+            const ElevatedButton(
               onPressed: openAppSettings,
-              child: const Text('Ouvrir les Paramètres'),
+                      child: const Text("Ouvrir les Paramètres"),
             ),
           ],
         ),
