@@ -26,6 +26,9 @@ jobs:
       - name: Get Flutter dependencies
         run: flutter pub get
 
+      - name: Check Java version
+        run: java -version
+
       - name: Accept Android licenses
         run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses
 
