@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:contacts_service/contacts_service.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart'; // Importer Share Plus
 import 'package:smart_sim_dz/models/contact_with_operator.dart';
@@ -130,14 +130,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadAndProcessContacts() async {
     try {
-      // Utiliser fetchContacts pour une meilleure performance potentielle
-      final Iterable<Contact> contacts = await ContactsService.getContacts(withThumbnails: false, photoHighResolution: false);
+      // Utiliser FlutterContacts pour récupérer les contacts
+      // Demander la permission si ce n'est pas déjà fait (flutter_contacts le gère aussi, mais vérifions)
+      if (!await FlutterContacts.requestPermission()) {
+        if (mounted) {
+          setState(() {
+            _permissionDenied = true;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+      final List<Contact> contacts = await FlutterContacts.getContacts(withProperties: true, withPhoto: false);
       if (!mounted) return;
       List<ContactWithOperator> processed = [];
       for (var contact in contacts) {
         // Prendre le premier numéro de téléphone disponible
-        String? phoneNumber = contact.phones?.isNotEmpty ?? false
-            ? contact.phones!.first.value
+        String? phoneNumber = contact.phones.isNotEmpty
+            ? contact.phones.first.number // Utiliser .number avec flutter_contacts
             : null;
 
         Operator operator = Operator.unknown;
@@ -146,14 +156,14 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         processed.add(ContactWithOperator(
-          contact: contact,
+          contact: contact, // Passe l'objet Contact de flutter_contacts
           operator: operator,
           primaryPhoneNumber: phoneNumber,
         ));
       }
 
       // Trier par nom d'affichage
-      processed.sort((a, b) => (a.contact.displayName ?? "").toLowerCase().compareTo((b.contact.displayName ?? "").toLowerCase()));
+      processed.sort((a, b) => (a.contact.displayName).toLowerCase().compareTo((b.contact.displayName).toLowerCase()));
 
       if (mounted) {
         setState(() {
