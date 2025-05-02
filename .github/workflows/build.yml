@@ -27,13 +27,7 @@ jobs:
         run: flutter pub get
 
       - name: Accept Android licenses
-        run: |
-          mkdir -p "$ANDROID_SDK_ROOT/licenses"
-          echo -e "\n8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb78af6dfcb131a6481e\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_SDK_ROOT/licenses/android-sdk-license"
-          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd\n504667f4c05b14a348d18cef1421319e1b0e975f" > "$ANDROID_SDK_ROOT/licenses/android-sdk-preview-license"
-          echo -e "\ne9addc83a56a514c84f16391404875da5b75d977\n59418c57c0068517833b17174e1cc338e7e927c1" > "$ANDROID_SDK_ROOT/licenses/android-googletv-license"
-          echo -e "\nd975f751698a77b662f1254ddbeed3901e976f5a" > "$ANDROID_SDK_ROOT/licenses/google-gdk-license"
-          echo -e "\n33b6a2b64607f11b759f320ef9dff4ae5c47d97a" > "$ANDROID_SDK_ROOT/licenses/mips-android-sysimage-license"
+        run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses
 
       - name: Build debug APK
         run: flutter build apk --debug
