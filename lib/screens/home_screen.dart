@@ -1,12 +1,15 @@
+# Refonte de HomeScreen avec Bento Grid et Material 3
+
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:share_plus/share_plus.dart'; // Importer Share Plus
+import 'package:share_plus/share_plus.dart';
 import 'package:smart_sim_dz/models/contact_with_operator.dart';
 import 'package:smart_sim_dz/utils/operator_detector.dart';
 import 'package:smart_sim_dz/screens/settings_screen.dart';
+import 'package:smart_sim_dz/screens/contacts_screen.dart'; // Écran séparé pour la liste complète
 import 'package:url_launcher/url_launcher.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -19,10 +22,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   bool _permissionDenied = false;
-  List<ContactWithOperator> _processedContacts = [];
-  List<ContactWithOperator> _filteredContacts = [];
-  final TextEditingController _searchController = TextEditingController();
-
   Operator _sim1Operator = Operator.unknown;
   Operator _sim2Operator = Operator.unknown;
   int _smartCallCounter = 0;
@@ -31,7 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
   // AdMob Banner Ad
   BannerAd? _bannerAd;
   bool _isBannerAdLoaded = false;
-  // TODO: Remplacer par l'ID d'unité d'annonces réel en production
   final String _adUnitId = "ca-app-pub-3940256099942544/6300978111"; // ID de test
 
   // Clés pour SharedPreferences
@@ -43,29 +41,30 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_filterContacts);
     _initializeScreen();
   }
 
   Future<void> _initializeScreen() async {
     await _loadPreferences();
-    await _requestContactsPermission();
+    await _requestContactsPermission(); // Vérifier les permissions au démarrage
     if (!_isPremium) {
       _loadBannerAd();
+    }
+    if (mounted) {
+      setState(() {
+        _isLoading = false; // Fin du chargement initial
+      });
     }
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_filterContacts);
-    _searchController.dispose();
     _bannerAd?.dispose();
     super.dispose();
   }
 
   Future<void> _loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
-    // Vérifier si le widget est toujours monté
     if (!mounted) return;
     setState(() {
       _sim1Operator = Operator.values[prefs.getInt(sim1PrefKey) ?? Operator.unknown.index];
@@ -98,368 +97,239 @@ class _HomeScreenState extends State<HomeScreen> {
     )..load();
   }
 
-  Future<void> _incrementSmartCallCounter() async {
-    final prefs = await SharedPreferences.getInstance();
-    int currentCount = prefs.getInt(smartCallCounterKey) ?? 0;
-    currentCount++;
-    await prefs.setInt(smartCallCounterKey, currentCount);
-    if (mounted) {
-      setState(() {
-        _smartCallCounter = currentCount;
-      });
-    }
-  }
-
   Future<void> _requestContactsPermission() async {
-    if (!mounted) return;
-    setState(() { _isLoading = true; });
     final status = await Permission.contacts.request();
     if (!mounted) return;
-    if (status.isGranted) {
-      setState(() {
-        _permissionDenied = false;
-      });
-      await _loadAndProcessContacts();
-    } else {
+    if (!status.isGranted) {
       setState(() {
         _permissionDenied = true;
-        _isLoading = false;
       });
-    }
-  }
-
-  Future<void> _loadAndProcessContacts() async {
-    try {
-      // Utiliser FlutterContacts pour récupérer les contacts
-      // La permission a déjà été vérifiée dans _requestContactsPermission
-      final List<Contact> contacts = await FlutterContacts.getContacts(withProperties: true, withPhoto: false);
-      if (!mounted) return;
-      List<ContactWithOperator> processed = [];
-      for (var contact in contacts) {
-        // Prendre le premier numéro de téléphone disponible
-        String? phoneNumber = contact.phones.isNotEmpty
-            ? contact.phones.first.number // Utiliser .number avec flutter_contacts
-            : null;
-
-        Operator operator = Operator.unknown;
-        if (phoneNumber != null) {
-          operator = detectOperator(phoneNumber);
-        }
-
-        processed.add(ContactWithOperator(
-          contact: contact, // Passe l'objet Contact de flutter_contacts
-          operator: operator,
-          primaryPhoneNumber: phoneNumber,
-        ));
-      }
-
-      // Trier par nom d'affichage
-      processed.sort((a, b) => (a.contact.displayName).toLowerCase().compareTo((b.contact.displayName).toLowerCase()));
-
-      if (mounted) {
-        setState(() {
-          _processedContacts = processed;
-          _filteredContacts = processed;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      print('Erreur lors du chargement/traitement des contacts: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          // Afficher un message d'erreur à l'utilisateur ?
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Erreur lors du chargement des contacts.')),
-          );
-        });
-      }
-    }
-  }
-
-  void _filterContacts() {
-    final query = _searchController.text.toLowerCase();
-    if (mounted) {
-      setState(() {
-        _filteredContacts = _processedContacts.where((c) {
-          final name = c.contact.displayName?.toLowerCase() ?? '';
-          final phone = c.primaryPhoneNumber?.toLowerCase() ?? '';
-          return name.contains(query) || phone.contains(query);
-        }).toList();
-      });
-    }
-  }
-
-  int? _getRecommendedSimSlot(Operator contactOperator) {
-    if (contactOperator == Operator.unknown) return null;
-    // TODO: Intégrer la logique des offres (illimité on-net/all-net) depuis Settings
-    if (_sim1Operator == contactOperator) return 1;
-    if (_sim2Operator == contactOperator) return 2;
-    // Si aucune SIM ne correspond, ne pas recommander (ou recommander SIM par défaut ?)
-    return null;
-  }
-
-  Future<void> _makeCall(String? phoneNumber, int? recommendedSimSlot) async {
-    if (phoneNumber == null || phoneNumber.isEmpty) {
-       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Numéro de téléphone invalide.')),
-        );
-      }
-      return;
-    }
-
-    if (recommendedSimSlot != null) {
-      await _incrementSmartCallCounter();
-    }
-
-    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
-    try {
-       if (!mounted) return;
-      bool launched = await launchUrl(launchUri);
-      if (!launched) {
-         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Impossible de lancer l\"appel vers $phoneNumber')),
-          );
-        }
-      }
-    } catch (e) {
-       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors du lancement de l\"appel: $e')),
-        );
-      }
     }
   }
 
   // Fonction pour partager l'application
   void _shareApp() {
-    // TODO: Remplacer par le vrai lien de l'application une fois publiée
     const String appLink = "https://play.google.com/store/apps/details?id=com.example.smart_sim_dz"; // Placeholder
     const String message = "Découvrez Smart SIM DZ, l'application qui vous aide à choisir la bonne SIM pour appeler en Algérie et économiser ! Téléchargez-la ici : $appLink";
     Share.share(message);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Utiliser un thème sombre simple pour l'instant
-    final ThemeData theme = ThemeData.dark().copyWith(
-      primaryColor: Colors.teal, // Couleur d'accentuation
-      // Personnaliser d'autres éléments du thème si nécessaire
+  void _navigateToSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SettingsScreen()),
     );
-
-    return MaterialApp(
-      theme: theme,
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Smart SIM DZ'),
-          elevation: 0, // Style moderne sans ombre
-          actions: [
-            // Bouton Partager
-            IconButton(
-              icon: const Icon(Icons.share),
-              tooltip: 'Partager l\"application',
-              onPressed: _shareApp,
-            ),
-            // Bouton Configuration
-            IconButton(
-              icon: const Icon(Icons.settings),
-              tooltip: 'Configuration',
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
-                );
-                // Recharger les préférences après retour des paramètres
-                await _loadPreferences();
-                // Recharger la bannière si nécessaire
-                if (!_isPremium && !_isBannerAdLoaded) {
-                   _loadBannerAd();
-                }
-                // Cacher la bannière si l'utilisateur est devenu premium
-                if (_isPremium && _isBannerAdLoaded) {
-                  if (mounted) {
-                    setState(() {
-                      _isBannerAdLoaded = false;
-                      _bannerAd?.dispose();
-                      _bannerAd = null;
-                    });
-                  }
-                }
-              },
-            ),
-          ],
-        ),
-        body: _buildBody(),
-        bottomNavigationBar: !_isPremium && _isBannerAdLoaded && _bannerAd != null
-            ? Container(
-                color: theme.bottomAppBarTheme.color ?? theme.colorScheme.surface, // Assurer une couleur de fond
-                height: _bannerAd!.size.height.toDouble(),
-                width: _bannerAd!.size.width.toDouble(),
-                child: AdWidget(ad: _bannerAd!),
-              )
-            : null,
-      ),
-    );
-  }
-
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    } else if (_permissionDenied) {
-      return _buildPermissionDeniedWidget();
-    } else {
-      return Column(
-        children: [
-          _buildSmartCallCounterWidget(),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Rechercher par nom ou numéro...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.0), // Coins plus arrondis
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                // Utiliser une couleur de fond légèrement différente du scaffold
-                fillColor: Theme.of(context).colorScheme.surfaceVariant,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-              ),
-            ),
-          ),
-          Expanded(
-            child: _filteredContacts.isEmpty
-                ? Center(child: Text(_searchController.text.isEmpty ? 'Aucun contact à afficher.' : 'Aucun contact trouvé pour "${_searchController.text}"'))
-                : ListView.builder(
-                    itemCount: _filteredContacts.length,
-                    itemBuilder: (context, index) {
-                      final item = _filteredContacts[index];
-                      final contactName = item.contact.displayName ?? 'Nom inconnu';
-                      final phoneNumber = item.primaryPhoneNumber ?? 'Numéro inconnu';
-                      final operator = item.operator;
-                      final recommendedSim = _getRecommendedSimSlot(operator);
-                      final logoPath = getOperatorLogoPath(operator);
-
-                      return ListTile(
-                        // Afficher le logo si disponible, sinon une icône par défaut
-                        leading: logoPath.isNotEmpty
-                            ? CircleAvatar(
-                                backgroundColor: Colors.transparent, // Fond transparent pour le logo
-                                child: Padding(
-                                  padding: const EdgeInsets.all(4.0), // Petit padding autour du logo
-                                  child: Image.asset(
-                                    logoPath,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      // En cas d'erreur de chargement du logo, afficher l'initiale
-                                      return CircleAvatar(
-                                        backgroundColor: getOperatorColor(operator),
-                                        child: Text(
-                                          getOperatorName(operator).substring(0, 1),
-                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              )
-                            : CircleAvatar(
-                                backgroundColor: getOperatorColor(operator),
-                                child: const Icon(Icons.person, color: Colors.white), // Icône par défaut
-                              ),
-                        title: Text(contactName),
-                        subtitle: Text(phoneNumber),
-                        trailing: recommendedSim != null
-                            ? ElevatedButton.icon(
-                                icon: const Icon(Icons.phone, size: 16),
-                                label: Text('SIM $recommendedSim'),
-                                onPressed: () => _makeCall(phoneNumber, recommendedSim),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: getOperatorColor(operator),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  textStyle: const TextStyle(fontSize: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                              )
-                            : IconButton(
-                                icon: const Icon(Icons.phone_forwarded),
-                                tooltip: 'Appeler (Opérateur inconnu ou non configuré)',
-                                onPressed: () => _makeCall(phoneNumber, null),
-                              ),
-                        onTap: () => _makeCall(phoneNumber, recommendedSim),
-                        // TODO: Ajouter une option pour la correction MNP (appui long ?)
-                      );
-                    },
-                  ),
-          ),
-        ],
-      );
+    await _loadPreferences(); // Recharger les préférences après retour
+    // Gérer la bannière AdMob en fonction du statut premium
+    if (!_isPremium && !_isBannerAdLoaded) _loadBannerAd();
+    if (_isPremium && _isBannerAdLoaded) {
+      if (mounted) {
+        setState(() {
+          _isBannerAdLoaded = false;
+          _bannerAd?.dispose();
+          _bannerAd = null;
+        });
+      }
     }
   }
 
-  Widget _buildSmartCallCounterWidget() {
-    // Style plus moderne pour le compteur
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(12.0),
+  void _navigateToContacts() {
+     if (_permissionDenied) {
+        // Afficher un dialogue ou un message indiquant que la permission est requise
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Permission Requise"),
+            content: const Text("L'accès aux contacts est nécessaire pour utiliser cette fonctionnalité. Veuillez accorder la permission dans les paramètres de l'application."),
+            actions: <Widget>[
+              TextButton(
+                child: const Text("Annuler"),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              TextButton(
+                child: const Text("Paramètres"),
+                onPressed: () {
+                  openAppSettings(); // Ouvre les paramètres de l'application
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ContactsScreen()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Smart SIM DZ'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: 'Partager l\"application',
+            onPressed: _shareApp,
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Configuration',
+            onPressed: _navigateToSettings,
+          ),
+        ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _buildBentoGrid(colorScheme, textTheme),
+      bottomNavigationBar: !_isPremium && _isBannerAdLoaded && _bannerAd != null
+          ? SafeArea(
+            child: Container(
+                color: colorScheme.surfaceVariant, // Couleur de fond pour la bannière
+                height: _bannerAd!.size.height.toDouble(),
+                width: _bannerAd!.size.width.toDouble(),
+                child: AdWidget(ad: _bannerAd!),
+              ),)
+          : null,
+    );
+  }
+
+  Widget _buildBentoGrid(ColorScheme colorScheme, TextTheme textTheme) {
+    // Utiliser GridView.count pour une grille simple, ou un layout plus complexe si besoin
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
         children: [
-          Icon(Icons.star_border_purple500_outlined, color: Theme.of(context).colorScheme.primary, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            '$_smartCallCounter appels optimisés !',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
+          // Bloc Recherche Rapide (prend toute la largeur)
+          _buildSearchBlock(colorScheme, textTheme),
+          const SizedBox(height: 16),
+          // Grille pour les autres blocs
+          GridView.count(
+            crossAxisCount: 2, // 2 colonnes
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(), // Désactiver le scroll interne
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            children: [
+              _buildSimStatusBlock(colorScheme, textTheme),
+              _buildSmartCallCounterBlock(colorScheme, textTheme),
+              // Ajouter d'autres blocs ici si nécessaire (ex: Contacts Favoris, Actions Rapides)
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPermissionDeniedWidget() {
-     return Center(
+  // --- Widgets pour les Blocs de la Bento Grid --- //
+
+  Widget _buildSearchBlock(ColorScheme colorScheme, TextTheme textTheme) {
+    return Card(
+       // Utiliser le style Filled pour un look plus intégré
+      elevation: 0,
+      color: colorScheme.surfaceVariant,
+      child: InkWell(
+        onTap: _navigateToContacts, // Naviguer vers l'écran des contacts au clic
+        borderRadius: BorderRadius.circular(12.0),
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Row(
             children: [
-              const Icon(Icons.contact_page_outlined, size: 60, color: Colors.grey),
-              const SizedBox(height: 20),
-              const Text(
-                'Accès aux contacts requis',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Smart SIM DZ a besoin de lire vos contacts pour identifier leur opérateur et vous aider à choisir la bonne SIM. Vos contacts restent sur votre téléphone.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14),
-              ),
-               const SizedBox(height: 20),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.settings),
-                label: const Text('Ouvrir les paramètres'),
-                onPressed: openAppSettings,
+              Icon(Icons.search, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 12),
+              Text(
+                'Rechercher des contacts...', // Texte indicatif
+                style: textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
               ),
             ],
           ),
         ),
-      );
+      ),
+    );
   }
+
+  Widget _buildSimStatusBlock(ColorScheme colorScheme, TextTheme textTheme) {
+    return Card(
+      elevation: 0,
+      color: colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Statut SIM', style: textTheme.titleMedium?.copyWith(color: colorScheme.onSecondaryContainer)),
+            const Spacer(),
+            _buildSimRow(1, _sim1Operator, colorScheme),
+            const SizedBox(height: 8),
+            _buildSimRow(2, _sim2Operator, colorScheme),
+            const Spacer(),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: IconButton(
+                icon: Icon(Icons.settings, color: colorScheme.onSecondaryContainer.withOpacity(0.7)),
+                tooltip: 'Configurer les SIM',
+                onPressed: _navigateToSettings,
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimRow(int simSlot, Operator operator, ColorScheme colorScheme) {
+    final logoPath = getOperatorLogoPath(operator);
+    final operatorName = getOperatorName(operator);
+    final operatorColor = getOperatorColor(operator);
+
+    return Row(
+      children: [
+        Text('SIM $simSlot: ', style: TextStyle(color: colorScheme.onSecondaryContainer)),
+        if (logoPath.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: Image.asset(logoPath, height: 16, errorBuilder: (c, e, s) => const SizedBox.shrink()),
+          )
+        else if (operator != Operator.unknown)
+           CircleAvatar(backgroundColor: operatorColor, radius: 8), // Pastille de couleur si pas de logo
+        Expanded(
+          child: Text(
+            operatorName,
+            style: TextStyle(color: colorScheme.onSecondaryContainer, fontWeight: FontWeight.bold),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSmartCallCounterBlock(ColorScheme colorScheme, TextTheme textTheme) {
+    return Card(
+      elevation: 0,
+      color: colorScheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Appels Optimisés', style: textTheme.titleMedium?.copyWith(color: colorScheme.onTertiaryContainer)),
+            const SizedBox(height: 8),
+            Text(
+              '$_smartCallCounter',
+              style: textTheme.headlineMedium?.copyWith(color: colorScheme.onTertiaryContainer, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 }
 

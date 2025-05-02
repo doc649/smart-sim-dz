@@ -1,6 +1,9 @@
+# Écran des paramètres pour configurer les SIM et afficher les codes USSD
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_sim_dz/utils/operator_detector.dart';
+import 'package:url_launcher/url_launcher.dart'; // Pour lancer les codes USSD
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,13 +15,30 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   Operator _sim1Operator = Operator.unknown;
   Operator _sim2Operator = Operator.unknown;
-  bool _isPremium = false; // Ajouter le statut premium
   bool _isLoading = true;
 
   // Clés pour SharedPreferences
   static const String sim1PrefKey = 'sim1_operator';
   static const String sim2PrefKey = 'sim2_operator';
-  static const String premiumStatusKey = 'is_premium'; // Clé pour le statut premium
+
+  // Map des codes USSD par opérateur
+  final Map<Operator, List<Map<String, String>>> _ussdCodes = {
+    Operator.djezzy: [
+      {'name': 'Consulter solde', 'code': '*710#'},
+      {'name': 'Recharger', 'code': '*720*CODE#'},
+      // Ajouter d'autres codes Djezzy
+    ],
+    Operator.mobilis: [
+      {'name': 'Consulter solde', 'code': '*222#'},
+      {'name': 'Recharger', 'code': '*666*CODE#'},
+      // Ajouter d'autres codes Mobilis
+    ],
+    Operator.ooredoo: [
+      {'name': 'Consulter solde', 'code': '*200#'},
+      {'name': 'Recharger', 'code': '*111*CODE#'},
+      // Ajouter d'autres codes Ooredoo
+    ],
+  };
 
   @override
   void initState() {
@@ -28,162 +48,188 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _sim1Operator = Operator.values[prefs.getInt(sim1PrefKey) ?? Operator.unknown.index];
       _sim2Operator = Operator.values[prefs.getInt(sim2PrefKey) ?? Operator.unknown.index];
-      _isPremium = prefs.getBool(premiumStatusKey) ?? false; // Charger le statut premium
       _isLoading = false;
     });
   }
 
-  Future<void> _saveSimConfiguration(int simSlot, Operator selectedOperator) async {
+  Future<void> _saveOperatorPreference(int simSlot, Operator operator) async {
     final prefs = await SharedPreferences.getInstance();
     final key = simSlot == 1 ? sim1PrefKey : sim2PrefKey;
-    await prefs.setInt(key, selectedOperator.index);
-    setState(() {
-      if (simSlot == 1) {
-        _sim1Operator = selectedOperator;
-      } else {
-        _sim2Operator = selectedOperator;
-      }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Configuration SIM $simSlot sauvegardée: ${getOperatorName(selectedOperator)}')), 
-    );
+    await prefs.setInt(key, operator.index);
+    if (mounted) {
+      setState(() {
+        if (simSlot == 1) {
+          _sim1Operator = operator;
+        } else {
+          _sim2Operator = operator;
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Opérateur SIM $simSlot mis à jour.')),
+      );
+    }
   }
 
-  // Placeholder pour la demande de premium
-  void _requestPremium() {
-    // Afficher une boîte de dialogue avec les instructions (à définir)
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Passer à Premium'),
-        content: const SingleChildScrollView(
-          child: Text(
-              'Pour supprimer les publicités, veuillez effectuer un paiement de [Montant à définir] DA via [Méthode à définir, ex: CCP, BaridiMob] et envoyer une preuve (capture d\`écran, référence) à [Contact à définir, ex: email, WhatsApp].\n\nVotre compte sera activé manuellement après vérification.'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _launchUssdCode(String code) async {
+    // Remplacer 'CODE' par une demande à l'utilisateur si nécessaire
+    if (code.contains('CODE')) {
+      // Pour l'instant, on informe juste qu'il faut remplacer le code
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez remplacer CODE par votre code de rechargement.')),
+      );
+      return; // Ou ouvrir un dialogue pour saisir le code
+    }
+
+    final Uri launchUri = Uri(scheme: 'tel', path: Uri.encodeComponent(code));
+    try {
+      if (!mounted) return;
+      bool launched = await launchUrl(launchUri);
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Impossible de lancer le code USSD $code')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors du lancement du code USSD: $e')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configuration'), // Titre généralisé
+        title: const Text('Paramètres'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView( // Utiliser ListView pour permettre le défilement si nécessaire
-              padding: const EdgeInsets.all(16.0),
+          : ListView(
+              padding: const EdgeInsets.symmetric(vertical: 16.0),
               children: [
-                // Section Configuration SIM
-                Text(
-                  'Configuration des SIMs',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Assignez l\'opérateur correspondant à chaque emplacement SIM de votre téléphone.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                _buildSimSelector(1, _sim1Operator),
-                const SizedBox(height: 16),
-                _buildSimSelector(2, _sim2Operator),
-                const SizedBox(height: 16),
-                Text(
-                  'Note: Cette configuration permet à l\'application de recommander la bonne SIM pour appeler vos contacts.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const Divider(height: 40),
-
-                // Section Premium
-                Text(
-                  'Version Premium',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 16),
-                if (_isPremium)
-                  const ListTile(
-                    leading: Icon(Icons.check_circle, color: Colors.green),
-                    title: Text('Vous êtes un utilisateur Premium !'),
-                    subtitle: Text('Merci pour votre soutien. Aucune publicité ne sera affichée.'),
-                  )
-                else
-                  ListTile(
-                    leading: const Icon(Icons.star_border),
-                    title: const Text('Supprimer les publicités'),
-                    subtitle: const Text('Passez à la version Premium pour une expérience sans publicité.'),
-                    trailing: ElevatedButton(
-                      onPressed: _requestPremium,
-                      child: const Text('Obtenir Premium'),
-                    ),
-                  ),
+                _buildSimConfigurationSection(textTheme, colorScheme),
+                const Divider(height: 32),
+                _buildUssdSection(textTheme, colorScheme),
+                // Ajouter d'autres sections si nécessaire (ex: A propos, Premium)
               ],
             ),
     );
   }
 
-  Widget _buildSimSelector(int simSlot, Operator currentOperator) {
-    List<Operator> availableOperators = [
-      Operator.unknown,
-      Operator.mobilis,
-      Operator.djezzy,
-      Operator.ooredoo,
-    ];
+  Widget _buildSimConfigurationSection(TextTheme textTheme, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Configuration des Opérateurs SIM',
+            style: textTheme.titleLarge?.copyWith(color: colorScheme.primary),
+          ),
+          const SizedBox(height: 16),
+          _buildOperatorDropdown(1, _sim1Operator, colorScheme),
+          const SizedBox(height: 16),
+          _buildOperatorDropdown(2, _sim2Operator, colorScheme),
+        ],
+      ),
+    );
+  }
 
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'SIM $simSlot',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<Operator>(
-              value: currentOperator,
-              decoration: InputDecoration(
-                // labelText: 'Opérateur pour SIM $simSlot',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-              items: availableOperators.map((Operator operator) {
-                return DropdownMenuItem<Operator>(
-                  value: operator,
-                  child: Row(
-                    children: [
-                      if (operator != Operator.unknown)
-                        CircleAvatar(
-                          backgroundColor: getOperatorColor(operator),
-                          radius: 10,
-                        ),
-                      if (operator != Operator.unknown)
-                        const SizedBox(width: 8),
-                      Text(getOperatorName(operator)),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (Operator? newValue) {
-                if (newValue != null) {
-                  _saveSimConfiguration(simSlot, newValue);
-                }
-              },
-            ),
-          ],
-        ),
+  Widget _buildOperatorDropdown(int simSlot, Operator currentOperator, ColorScheme colorScheme) {
+    return DropdownButtonFormField<Operator>(
+      value: currentOperator,
+      decoration: InputDecoration(
+        labelText: 'Opérateur SIM $simSlot',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+        filled: true,
+        fillColor: colorScheme.surfaceVariant.withOpacity(0.5),
+      ),
+      items: Operator.values.map((Operator operator) {
+        final logoPath = getOperatorLogoPath(operator);
+        final operatorName = getOperatorName(operator);
+        return DropdownMenuItem<Operator>(
+          value: operator,
+          child: Row(
+            children: [
+              if (logoPath.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Image.asset(logoPath, height: 20, errorBuilder: (c, e, s) => const SizedBox.shrink()),
+                )
+              else if (operator != Operator.unknown)
+                 CircleAvatar(backgroundColor: getOperatorColor(operator), radius: 10), // Pastille
+              const SizedBox(width: 8),
+              Text(operatorName),
+            ],
+          ),
+        );
+      }).toList(),
+      onChanged: (Operator? newValue) {
+        if (newValue != null) {
+          _saveOperatorPreference(simSlot, newValue);
+        }
+      },
+    );
+  }
+
+  Widget _buildUssdSection(TextTheme textTheme, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Codes USSD Utiles',
+            style: textTheme.titleLarge?.copyWith(color: colorScheme.primary),
+          ),
+          const SizedBox(height: 16),
+          // Utiliser ExpansionPanelList pour organiser par opérateur
+          ExpansionPanelList(
+            elevation: 1,
+            expandedHeaderPadding: EdgeInsets.zero,
+            children: _ussdCodes.entries.where((entry) => entry.key != Operator.unknown).map<ExpansionPanel>((entry) {
+              final operator = entry.key;
+              final codes = entry.value;
+              final logoPath = getOperatorLogoPath(operator);
+              final operatorName = getOperatorName(operator);
+
+              return ExpansionPanel(
+                headerBuilder: (BuildContext context, bool isExpanded) {
+                  return ListTile(
+                    leading: logoPath.isNotEmpty
+                        ? Image.asset(logoPath, height: 24, errorBuilder: (c, e, s) => const SizedBox.shrink())
+                        : CircleAvatar(backgroundColor: getOperatorColor(operator), radius: 12),
+                    title: Text(operatorName, style: textTheme.titleMedium),
+                  );
+                },
+                body: Column(
+                  children: codes.map((codeMap) {
+                    return ListTile(
+                      title: Text(codeMap['name']!),
+                      subtitle: Text(codeMap['code']!),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.send_to_mobile),
+                        tooltip: 'Lancer le code',
+                        onPressed: () => _launchUssdCode(codeMap['code']!),
+                      ),
+                      onTap: () => _launchUssdCode(codeMap['code']!),
+                    );
+                  }).toList(),
+                ),
+                isExpanded: true, // Garder ouvert par défaut ou gérer l'état
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
