@@ -131,16 +131,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadAndProcessContacts() async {
     try {
       // Utiliser FlutterContacts pour récupérer les contacts
-      // Demander la permission si ce n'est pas déjà fait (flutter_contacts le gère aussi, mais vérifions)
-      if (!await FlutterContacts.requestPermission()) {
-        if (mounted) {
-          setState(() {
-            _permissionDenied = true;
-            _isLoading = false;
-          });
-        }
-        return;
-      }
+      // La permission a déjà été vérifiée dans _requestContactsPermission
       final List<Contact> contacts = await FlutterContacts.getContacts(withProperties: true, withPhoto: false);
       if (!mounted) return;
       List<ContactWithOperator> processed = [];
